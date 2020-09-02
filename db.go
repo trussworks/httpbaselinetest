@@ -53,6 +53,9 @@ func getTableStats(db *sqlx.DB, tableStats *[]pgStatUserTableInsUpdDel) error {
 	// included in pg_stat_all_tables and related views). The
 	// columns for numbers of live and dead rows and vacuum and
 	// analyze actions are not present in this view.
+	//
+	// We use pg_stat_xact_user_tables since that's all we are
+	// interested in
 	sql := `
 SELECT
   relname, n_tup_ins, n_tup_upd, n_tup_del

@@ -7,6 +7,8 @@ database.
 The httpbaselinetest package provides a framework for recording
 requests, responses, and the expected database changes.
 
+Currently only works with postgresql.
+
 ## Example
 
 ```go
@@ -46,9 +48,14 @@ requests, responses, and the expected database changes.
 First, generate a set of baselines
 
     $ REBASELINE=1 go test ./pkg/... \
-      -run TestBaselines/POST_v1_car_with_auth  -count=1
+      -run TestBaselines/POST_v1_car_with_auth -count=1
+      
+Now, run your baseline tests to make sure nothing has changed
 
-Now, let's look at the generated files
+    $ go test ./pkg/... \
+      -run TestBaselines/POST_v1_car_with_auth -count=1
+
+Let's look at the generated files from when `REBASELINE` was configured.
 
 ### Request File
 ```
@@ -105,3 +112,132 @@ Content-Type: application/json
   }
 }
 ```
+## Database Baselines
+The database baseline feature expects to be run inside a transaction.
+It then uses
+[pg_stat_xact_user_tables](https://www.postgresql.org/docs/current/monitoring-stats.html)
+to track which tables have changes.  For tests that do expect database
+changes, the `HttpBaselineTest.Tables` field should be set so that a
+baseline of expected database changes can be created.  If your
+baseline test makes changes to a table that is not configured, the
+test will fail. 
+
+### Testing with Transactions
+Use [go-txdb](https://github.com/DATA-DOG/go-txdb) to have all of your
+baseline tests run in a separate transaction so that any changes are
+discarded at the end of the test.
+
+You can create a separate fake database name for each test to ensure a
+new connection is created.
+
+### go-txdb basic example
+```go
+import (
+	"github.com/DATA-DOG/go-txdb"
+)
+// ...
+
+realDbUrl := "postgres://user:pass@dbhost:5432/my_test_db?sslmode=disable"
+txdb.Register("pgx", "postgres", realDbUrl)
+setupFunc := func(testName string, btest *httpbaselinetest.HttpBaselineTest) error {
+  normalizedTestName := httpbaselinetest.NormalizeTestName(testName)
+  testDbUrl := "pgx://user:pass@" + "txdb_" + normalizedTestName +
+    " :5432/?sslmode=disable"
+  server := myhttpserverpkg.NewServer(testDbUrl)
+  btest.Handler = server
+  btest.db = server.Db()
+}
+```
+
+### go-txdb Pop example
+[pop](https://github.com/gobuffalo/pop) makes this a bit more
+exciting. This example is for v4.13.1 where you have to create your
+own [pop.store](https://github.com/gobuffalo/pop/blob/v4.13.1/store.go).
+
+```go
+type BaselinePopStore struct {
+	*sqlx.DB
+}
+
+func (bps *BaselinePopStore) Commit() error {
+	return nil
+}
+
+func (bps *BaselinePopStore) Rollback() error {
+	return nil
+}
+
+func (bps *BaselinePopStore) Transaction() (*pop.Tx, error) {
+	t := &pop.Tx{
+		ID: rand.Int(),
+	}
+	tx, err := bps.DB.Beginx()
+	t.Tx = tx
+	return t, fmt.Errorf("could not create new transaction %w", err)
+}
+
+func getPopConnectionDetails() pop.ConnectionDetails {
+  return pop.ConnectionDetails {
+    Dialect: "postgres",
+    Database: "my_test_db",
+    // ...
+  }
+}
+
+func getDbUrl(popDetails pop.ConnectionDetails) string {
+	return fmt.Sprintf("%s://%s:%s@%s:%s/%s?sslmode=%s",
+		popDetails.Dialect, popDetails.User, popDetails.Password, popDetails.Host,
+		popDetails.Port, popDetails.Database, popDetails.Options["sslmode"])
+}
+
+popDetails := getPopConnectionDetails()
+realDbUrl := getDbUrl(popDetails)
+txdb.Register("pgx", "postgres", realDbUrl)
+popDetails.Driver = "pgx"
+popDetails.Dialect = "postgres"
+setupFunc := func(testName string, btest*httpbaselinetest.HttpBaselineTest) error {
+  popDetails.Database = "txdb_" + httpbaselinetest.NormalizeTestName(name)
+  popConn, err := pop.NewConnection(popDetails)
+  if err != nil {
+	return fmt.Errorf("Cannot create new POP connection: %s", err)
+  }
+  testDbUrl := getDbUrl(popDetails)
+  db, err := sqlx.Connect(popDetails.Driver, testDbUrl)
+  if err != nil {
+	return err
+  }
+  popConn.Store = &BaselinePopStore{DB: db}
+  // can now use popConn as usual
+}
+```
+
+## Caveats and Complications
+Thinking of your HTTP service as a state machine is very powerful, but
+also may require re-thinking how you configure your service.  Ideally
+you want a way to configure all of the initial state of your service.
+That includes things like ways to [configure the current
+time](https://godoc.org/github.com/facebookgo/clock), [generate UUIDs
+from a specific random
+source](https://github.com/google/uuid/blob/master/version4.go#L34),
+etc.  If this is possible, then you can run your tests in parallel and
+know that they will produce deterministic results.
+
+Unfortunately, it's very common for go libraries to keep package
+private global state.  You may have to find creative ways to reset
+this state between tests.  This also means you cannot run your tests
+in parallel.
+
+Making your service deterministic is a challenge, but doing so can
+help fully understand all of the state your service depends on.  If
+you can capture this, that makes it more likely you can reproduce bugs
+seen in production in a development environment.
+
+Another consequence is that baselines need to be normalized. For
+example, the order of fields in a JSON response shouldn't matter.
+However, sometimes the order of objects in an array doesn't matter (it
+can be whatever order is returned by the db), but sometimes it does
+because the underlying request expects objects ordered by some
+criteria.
+
+Additional features to post-process baselines may be needed.
+
