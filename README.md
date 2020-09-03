@@ -12,37 +12,38 @@ Currently only works with postgresql.
 ## Example
 
 ```go
-	setupFunc := func(name string, btest *baselinetest.BaselineTest) error {
-      // Create your http handler here
-      myserver := myhttp.NewServer()
-      btest.Handler = myserver
-      // Tell httpbaselinetest to use the db connection.
-      // More on this feature later
-      btest.Db = myserver.Db() 
-      return nil
-    }
-	teardownFunc := func(t *testing.T, btest *baselinetest.BaselineTest) error {
-      // Maybe clean something up?
-      return nil
-    }
-	bts := httpbaselinetest.NewDefaultBaselineTestSuite(t)
-	bts.Run("POST v1 car with auth", httpbaselinetest.BaselineTest{
-		Setup: setupFunc,
-		Teardown: teardownFunc,
-		Method:  http.MethodPost,
-		Path:    "/api/v1/car",
-		Body: map[string]string{
-			"make":      "Honda",
-			"model":     "Accord",
-			"modelYear": "2020",
-            "color":     "red",
-		},
-		Headers: map[string]string{
-			"Authorization": "MySecret",
-			"Content-Type": "application/json",
-		},
-		Tables: []string{"cars"},
-	})
+
+setupFunc := func(name string, btest *baselinetest.BaselineTest) error {
+  // Create your http handler here
+  myserver := myhttp.NewServer()
+  btest.Handler = myserver
+  // Tell httpbaselinetest to use the db connection.
+  // More on this feature later
+  btest.Db = myserver.Db() 
+  return nil
+}
+teardownFunc := func(t *testing.T, btest *baselinetest.BaselineTest) error {
+  // Maybe clean something up?
+  return nil
+}
+bts := httpbaselinetest.NewDefaultBaselineTestSuite(t)
+bts.Run("POST v1 car with auth", httpbaselinetest.BaselineTest{
+    Setup: setupFunc,
+    Teardown: teardownFunc,
+    Method:  http.MethodPost,
+    Path:    "/api/v1/car",
+    Body: map[string]string{
+        "make":      "Honda",
+        "model":     "Accord",
+        "modelYear": "2020",
+        "color":     "red",
+    },
+    Headers: map[string]string{
+        "Authorization": "MySecret",
+        "Content-Type": "application/json",
+    },
+    Tables: []string{"cars"},
+})
 ```
 
 First, generate a set of baselines
@@ -54,6 +55,23 @@ Now, run your baseline tests to make sure nothing has changed
 
     $ go test ./pkg/... \
       -run TestBaselines/POST_v1_car_with_auth -count=1
+      
+What happens if your baseline doesn't match?  Here the request has been changed:
+
+    $ go test ./pkg/... \
+      -run TestBaselines/POST_v1_car_with_auth -count=1
+    --- FAIL: TestBaselines (0.01s)
+    --- FAIL: TestBaselines/POST_v1_car_with_auth (0.01s)
+        suite.go:222: Request Difference
+        suite.go:223: 
+            --- testdata/post_v1_car_with_auth.resp.txt (expected)
+            +++ actual
+            @@ -5 +5 @@
+            -  "modelYear": "2020",
+            +  "modelYear": "1999",
+            @@ -11 +10,0 @@
+            -
+
 
 Let's look at the generated files from when `REBASELINE` was configured.
 
