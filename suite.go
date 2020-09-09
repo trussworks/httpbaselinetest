@@ -58,6 +58,7 @@ type httpBaselineTestRunner struct {
 	baselineReqPath  string
 	baselineRespPath string
 	baselineDbPath   string
+	seedPath         string
 	dbTableInfo      *dbTableInfo
 }
 
@@ -80,6 +81,10 @@ func newRunner(testName string, t *testing.T, suite *HttpBaselineTestSuite,
 	}
 	nPathPrefix := path.Join(suite.baselineDir, NormalizeTestName(testName))
 
+	var seedPath string
+	if btest.Seed != "" {
+		seedPath = path.Join(suite.baselineDir, btest.Seed)
+	}
 	return httpBaselineTestRunner{
 		testName:         testName,
 		suite:            suite,
@@ -88,6 +93,7 @@ func newRunner(testName string, t *testing.T, suite *HttpBaselineTestSuite,
 		baselineReqPath:  nPathPrefix + ".req.txt",
 		baselineRespPath: nPathPrefix + ".resp.txt",
 		baselineDbPath:   nPathPrefix + ".db.json",
+		seedPath:         seedPath,
 		dbTableInfo:      &dbTableInfo{},
 	}
 }
@@ -147,7 +153,7 @@ func (r *httpBaselineTestRunner) assertBaselineEquality(expectedPath string, for
 	}
 }
 
-func (r *httpBaselineTestRunner) writeBaseline(path string, formattedData []byte) {
+func (r *httpBaselineTestRunner) writeFile(path string, formattedData []byte) {
 	err := ioutil.WriteFile(path, []byte(formattedData), 0644)
 	if err != nil {
 		r.t.Fatalf("Error writing baseline %s: %s", path, err)
@@ -179,7 +185,7 @@ func (suite *HttpBaselineTestSuite) Run(name string, btest HttpBaselineTest) {
 			}
 		}
 		if doRebaseline() {
-			runner.writeBaseline(runner.baselineReqPath,
+			runner.writeFile(runner.baselineReqPath,
 				[]byte(formattedReq))
 		} else {
 			runner.assertBaselineEquality(runner.baselineReqPath,
@@ -199,7 +205,7 @@ func (suite *HttpBaselineTestSuite) Run(name string, btest HttpBaselineTest) {
 			}
 		}
 		if doRebaseline() {
-			runner.writeBaseline(runner.baselineRespPath,
+			runner.writeFile(runner.baselineRespPath,
 				[]byte(formattedResp))
 		} else {
 			runner.assertBaselineEquality(runner.baselineRespPath,
@@ -214,7 +220,7 @@ func (suite *HttpBaselineTestSuite) Run(name string, btest HttpBaselineTest) {
 					t.Fatalf("Cannot format db baseline: %s", err)
 				}
 				if doRebaseline() {
-					runner.writeBaseline(runner.baselineDbPath, formattedDb)
+					runner.writeFile(runner.baselineDbPath, formattedDb)
 				} else {
 					runner.assertBaselineEquality(runner.baselineDbPath,
 						string(formattedDb))

@@ -130,15 +130,37 @@ Content-Type: application/json
   }
 }
 ```
+## Database Seeding
+You may need to get the database into an appropriate state before
+running your tests.
+### Seed File
+
+You can configure a YAML `Seed` file that will be loaded with
+[polluter](https://github.com/romanyx/polluter). This gives you
+maximum control over exactly what is in the db, plus gives a text file
+can that be easily compared for changes.
+
+### Seed Function
+You can also configure a `SeedFunc` to load seed data. The
+`HttpBaselineTest` is passed as an argument to the function so you can
+use the already established database connection. If you want, you can
+run your tests with both a `Seed` and a `SeedFunc`. The `SeedFunc`
+will be run first.
+
+Finally, if the `REGENERATE_SEED` environment variable is set and both
+a `Seed` and `SeedFunc` are provided, the `Seed` will be overwritten
+after running `SeedFunc`. This lets you create your `Seed` file data
+programmatically and the dump to YAML for more customization.
+
 ## Database Baselines
 The database baseline feature expects to be run inside a transaction.
 It then uses
 [pg_stat_xact_user_tables](https://www.postgresql.org/docs/current/monitoring-stats.html)
-to track which tables have changes.  For tests that do expect database
+to track which tables have changes. For tests that do expect database
 changes, the `HttpBaselineTest.Tables` field should be set so that a
-baseline of expected database changes can be created.  If your
-baseline test makes changes to a table that is not configured, the
-test will fail. 
+baseline of expected database changes can be created. If your baseline
+test makes changes to a table that is not configured, the test will
+fail.
 
 ### Testing with Transactions
 Use [go-txdb](https://github.com/DATA-DOG/go-txdb) to have all of your
