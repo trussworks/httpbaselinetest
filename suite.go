@@ -1,6 +1,7 @@
 package httpbaselinetest
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -112,11 +113,15 @@ func formatJson(body []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	pj, err := json.MarshalIndent(v, "", "  ")
+	// use encoder to add trailing newline
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	err = enc.Encode(v)
 	if err != nil {
 		return "", err
 	}
-	return string(pj), nil
+	return string(buf.Bytes()), nil
 }
 
 func formatBody(contentType string, body []byte) (string, error) {
