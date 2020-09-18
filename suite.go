@@ -42,6 +42,7 @@ type HttpBaselineTest struct {
 	Path              string
 	Body              interface{} // io.Reader or string
 	Headers           map[string]string
+	Cookies           []http.Cookie
 	RequestValidator  HttpBaselineTestBodyValidatorFunc
 	ResponseValidator HttpBaselineTestBodyValidatorFunc
 

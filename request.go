@@ -89,5 +89,8 @@ func (r *httpBaselineTestRunner) buildRequest() *http.Request {
 	for key, val := range r.btest.Headers {
 		req.Header.Add(key, val)
 	}
+	for _, cookie := range r.btest.Cookies {
+		req.AddCookie(&cookie)
+	}
 	return req
 }
