@@ -30,14 +30,14 @@ type pgStatUserTableInsUpdDel struct {
 
 type dbTableInfo struct {
 	InitialTableNames []string
-	PgBaseline pgBaselineMap
+	PgBaseline        pgBaselineMap
 }
 
-type JsonTableData map[string]bool
+type JSONTableData map[string]bool
 
 type pgBaselineData struct {
 	PgInsUpdDel     *pgStatUserTableInsUpdDel
-	BeforeTableData *JsonTableData
+	BeforeTableData *JSONTableData
 }
 
 type pgBaselineMap map[string]pgBaselineData
@@ -89,7 +89,7 @@ ORDER BY kcu.table_name
 	if err != nil {
 		return nil, err
 	}
-	depMap := make(map[string][]string, 0)
+	depMap := make(map[string][]string)
 	for rows.Next() {
 		cols, err := rows.SliceScan()
 		if err != nil {
@@ -110,9 +110,9 @@ ORDER BY kcu.table_name
 }
 
 func dependencyOrder(depMap map[string][]string) []string {
-	visited := make(map[string]bool, 0)
-	deps := make([]string, 0)
-	todo := make([]string, 0)
+	visited := make(map[string]bool)
+	deps := []string{}
+	todo := []string{}
 	var tableName string
 	// first put all tables into todo
 	for tableName := range depMap {
@@ -150,7 +150,7 @@ func dependencyOrder(depMap map[string][]string) []string {
 	return deps
 }
 
-func getJsonTableData(db *sqlx.DB, tableName string, jsonTableData *JsonTableData) error {
+func getJSONTableData(db *sqlx.DB, tableName string, jsonTableData *JSONTableData) error {
 	sql := `SELECT to_jsonb("` + tableName + `".*) AS json_data FROM "` +
 		tableName + `"`
 	rows, err := db.Queryx(sql)
@@ -170,15 +170,15 @@ func getJsonTableData(db *sqlx.DB, tableName string, jsonTableData *JsonTableDat
 
 func buildFormattedDbBaseline(pgInsUpDel pgStatUserTableInsUpdDel,
 	removedRows []string, addedRows []string) (formattedDbBaseline, error) {
-	removedRowsJson := make([]interface{}, len(removedRows))
-	addedRowsJson := make([]interface{}, len(addedRows))
+	removedRowsJSON := make([]interface{}, len(removedRows))
+	addedRowsJSON := make([]interface{}, len(addedRows))
 	for i := range removedRows {
 		var v interface{}
 		err := json.Unmarshal([]byte(removedRows[i]), &v)
 		if err != nil {
 			return formattedDbBaseline{}, err
 		}
-		removedRowsJson[i] = v
+		removedRowsJSON[i] = v
 	}
 	for i := range addedRows {
 		var v interface{}
@@ -186,14 +186,14 @@ func buildFormattedDbBaseline(pgInsUpDel pgStatUserTableInsUpdDel,
 		if err != nil {
 			return formattedDbBaseline{}, err
 		}
-		addedRowsJson[i] = v
+		addedRowsJSON[i] = v
 	}
 	fdb := formattedDbBaseline{
 		NumRowsInserted: pgInsUpDel.NTupIns,
 		NumRowsUpdated:  pgInsUpDel.NTupUpd,
 		NumRowsDeleted:  pgInsUpDel.NTupDel,
-		RemovedRows:     removedRowsJson,
-		AddedRows:       addedRowsJson,
+		RemovedRows:     removedRowsJSON,
+		AddedRows:       addedRowsJSON,
 	}
 	return fdb, nil
 }
@@ -230,11 +230,11 @@ func (r *httpBaselineTestRunner) getDbTableInfo() {
 		r.t.Fatalf("Error selecting user table info: %s", err)
 	}
 	r.dbTableInfo.InitialTableNames = make([]string, len(beforeTableStats))
-	r.dbTableInfo.PgBaseline = make(pgBaselineMap, 0)
-	jsonTableDataMap := make(map[string]*JsonTableData)
+	r.dbTableInfo.PgBaseline = make(pgBaselineMap)
+	jsonTableDataMap := make(map[string]*JSONTableData)
 	for _, tableName := range r.btest.Tables {
-		jtd := make(JsonTableData)
-		err := getJsonTableData(r.btest.Db, tableName, &jtd)
+		jtd := make(JSONTableData)
+		err := getJSONTableData(r.btest.Db, tableName, &jtd)
 		if err != nil {
 			r.t.Fatalf("Error getting data for %s: %s", tableName, err)
 		}
@@ -311,7 +311,7 @@ func (r *httpBaselineTestRunner) generateDbBaseline() dbBaseline {
 		r.t.Fatal("Tables created/deleted in test")
 	}
 
-	fullDbBaseline := make(map[string]formattedDbBaseline, 0)
+	fullDbBaseline := make(map[string]formattedDbBaseline)
 	for _, tableName := range r.dbTableInfo.InitialTableNames {
 		beforePgInsUpdDel := *(r.dbTableInfo.PgBaseline[tableName].PgInsUpdDel)
 		afterPgInsUpdDel := afterTableMap[tableName]
@@ -323,32 +323,35 @@ func (r *httpBaselineTestRunner) generateDbBaseline() dbBaseline {
 		}
 		if r.dbTableInfo.PgBaseline[tableName].BeforeTableData != nil {
 			// BeforeTableData means this is in btest.Tables
-			afterJsonTableData := make(JsonTableData)
-			err := getJsonTableData(r.btest.Db, tableName, &afterJsonTableData)
+			afterJSONTableData := make(JSONTableData)
+			err := getJSONTableData(r.btest.Db, tableName, &afterJSONTableData)
 			if err != nil {
 				r.t.Fatalf("Error getting data for %s: %s", tableName, err)
 			}
-			removedRows := make([]string, 0)
-			addedRows := make([]string, 0)
+			removedRows := []string{}
+			addedRows := []string{}
 			btd := *(r.dbTableInfo.PgBaseline[tableName].BeforeTableData)
 			for row := range btd {
-				if !afterJsonTableData[row] {
+				if !afterJSONTableData[row] {
 					removedRows = append(removedRows, row)
 				}
 			}
-			for row := range afterJsonTableData {
+			for row := range afterJSONTableData {
 				if !btd[row] {
 					addedRows = append(addedRows, row)
 				}
 			}
 			tableDbBaseline, err := buildFormattedDbBaseline(diffPgInsUpdDel, removedRows, addedRows)
+			if err != nil {
+				r.t.Fatalf("Error building formatted db baseline %s", err)
+			}
 			fullDbBaseline[tableName] = tableDbBaseline
 		} else {
 			if beforePgInsUpdDel != afterPgInsUpdDel {
 				fullDbBaseline[tableName] = formattedDbBaseline{
 					NumRowsInserted: diffPgInsUpdDel.NTupIns,
-					NumRowsDeleted: diffPgInsUpdDel.NTupDel,
-					NumRowsUpdated: diffPgInsUpdDel.NTupUpd,
+					NumRowsDeleted:  diffPgInsUpdDel.NTupDel,
+					NumRowsUpdated:  diffPgInsUpdDel.NTupUpd,
 				}
 			}
 		}
@@ -358,7 +361,7 @@ func (r *httpBaselineTestRunner) generateDbBaseline() dbBaseline {
 }
 
 func (r *httpBaselineTestRunner) assertNoDbChanges(fullDbBaseline map[string]formattedDbBaseline) {
-	if (len(fullDbBaseline) != 0) {
+	if len(fullDbBaseline) != 0 {
 		for tableName, tableDiff := range fullDbBaseline {
 			r.t.Errorf("Unexpected table change for %s: %d row(s) inserted, %d row(s) updated, %d row(s) deleted",
 				tableName, tableDiff.NumRowsInserted,
@@ -399,4 +402,3 @@ func (r *httpBaselineTestRunner) dumpForPolluter() {
 	// reset
 	r.dbTableInfo = &dbTableInfo{}
 }
-

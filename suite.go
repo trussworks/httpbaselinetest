@@ -16,25 +16,25 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-type HttpBaselineTestSuite struct {
+type Suite struct {
 	t           *testing.T
 	baselineDir string
 }
 
-func NewDefaultHttpBaselineTestSuite(t *testing.T) *HttpBaselineTestSuite {
-	return &HttpBaselineTestSuite{
+func NewDefaultSuite(t *testing.T) *Suite {
+	return &Suite{
 		t:           t,
 		baselineDir: "testdata",
 	}
 }
 
-type HttpBaselineTestSetupFunc func(testName string, baselineTest *HttpBaselineTest) error
-type HttpBaselineTestTeardownFunc func(t *testing.T, baselineTest *HttpBaselineTest) error
-type HttpBaselineTestSeedFunc func(baselineTest *HttpBaselineTest) error
-type HttpBaselineTestBodyValidatorFunc func(body []byte) error
-type HttpBaselineTest struct {
-	Setup    HttpBaselineTestSetupFunc
-	Teardown HttpBaselineTestTeardownFunc
+type SetupFunc func(testName string, baselineTest *HTTPBaselineTest) error
+type TeardownFunc func(t *testing.T, baselineTest *HTTPBaselineTest) error
+type SeedFunc func(baselineTest *HTTPBaselineTest) error
+type BodyValidatorFunc func(body []byte) error
+type HTTPBaselineTest struct {
+	Setup    SetupFunc
+	Teardown TeardownFunc
 	Custom   interface{}
 
 	Handler           http.Handler
@@ -43,19 +43,19 @@ type HttpBaselineTest struct {
 	Body              interface{} // io.Reader or string
 	Headers           map[string]string
 	Cookies           []http.Cookie
-	RequestValidator  HttpBaselineTestBodyValidatorFunc
-	ResponseValidator HttpBaselineTestBodyValidatorFunc
+	RequestValidator  BodyValidatorFunc
+	ResponseValidator BodyValidatorFunc
 
 	Db       *sqlx.DB
 	Seed     string
-	SeedFunc HttpBaselineTestSeedFunc
+	SeedFunc SeedFunc
 	Tables   []string
 }
 
 type httpBaselineTestRunner struct {
 	testName         string
-	suite            *HttpBaselineTestSuite
-	btest            *HttpBaselineTest
+	suite            *Suite
+	btest            *HTTPBaselineTest
 	t                *testing.T
 	baselineReqPath  string
 	baselineRespPath string
@@ -64,8 +64,8 @@ type httpBaselineTestRunner struct {
 	dbTableInfo      *dbTableInfo
 }
 
-func newRunner(testName string, t *testing.T, suite *HttpBaselineTestSuite,
-	btest *HttpBaselineTest) httpBaselineTestRunner {
+func newRunner(testName string, t *testing.T, suite *Suite,
+	btest *HTTPBaselineTest) httpBaselineTestRunner {
 	if btest.Setup != nil {
 		err := btest.Setup(testName, btest)
 		if err != nil {
@@ -108,7 +108,7 @@ func NormalizeTestName(name string) string {
 	return string(tbytes)
 }
 
-func formatJson(body []byte) (string, error) {
+func formatJSON(body []byte) (string, error) {
 	var v interface{}
 	err := json.Unmarshal(body, &v)
 	if err != nil {
@@ -122,15 +122,15 @@ func formatJson(body []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(buf.Bytes()), nil
+	return buf.String(), nil
 }
 
 func formatBody(contentType string, body []byte) (string, error) {
 	if contentType == "application/json" {
-		return formatJson(body)
-	} else {
-		return string(body), nil
+		return formatJSON(body)
 	}
+	return string(body), nil
+
 }
 
 func doRebaseline() bool {
@@ -160,13 +160,14 @@ func (r *httpBaselineTestRunner) assertBaselineEquality(expectedPath string, for
 }
 
 func (r *httpBaselineTestRunner) writeFile(path string, formattedData []byte) {
+	// #nosec G306 -- The test files should be world readable
 	err := ioutil.WriteFile(path, []byte(formattedData), 0644)
 	if err != nil {
 		r.t.Fatalf("Error writing baseline %s: %s", path, err)
 	}
 }
 
-func (suite *HttpBaselineTestSuite) Run(name string, btest HttpBaselineTest) {
+func (suite *Suite) Run(name string, btest HTTPBaselineTest) {
 	suite.t.Run(name, func(t *testing.T) {
 		// Should probably have some way of indicating if the
 		// test should be t.Parallel()
@@ -185,7 +186,7 @@ func (suite *HttpBaselineTestSuite) Run(name string, btest HttpBaselineTest) {
 			t.Fatalf("Error formatting request: %s", err)
 		}
 		if btest.RequestValidator != nil {
-			err := btest.RequestValidator(rawReqBody)
+			err = btest.RequestValidator(rawReqBody)
 			if err != nil {
 				t.Errorf("Error validating request: %s", err)
 			}

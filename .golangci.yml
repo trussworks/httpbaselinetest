@@ -1,0 +1,28 @@
+linters-settings:
+  govet:
+    check-shadowing: true
+linters:
+  enable:
+    - deadcode
+    - gofmt
+    - goimports
+    - revive
+    - gosec
+    - govet
+    - ineffassign
+    - structcheck
+    - typecheck
+    - varcheck
+    - gomodguard
+    - errcheck
+    - staticcheck
+  fast: false
+issues:
+  fix: true
+run:
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  deadline: 8m
+  concurrency: 1
+  issues-exit-code: 1
+  tests: true
+  skip-dirs-use-default: true
