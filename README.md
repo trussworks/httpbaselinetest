@@ -13,21 +13,21 @@ Currently only works with postgresql.
 
 ```go
 
-setupFunc := func(name string, btest *baselinetest.BaselineTest) error {
+setupFunc := func(name string, btest *httpbaselinetest.HTTPBaselineTest) error {
   // Create your http handler here
   myserver := myhttp.NewServer()
   btest.Handler = myserver
   // Tell httpbaselinetest to use the db connection.
   // More on this feature later
-  btest.Db = myserver.Db() 
+  btest.Db = myserver.Db()
   return nil
 }
-teardownFunc := func(t *testing.T, btest *baselinetest.BaselineTest) error {
+teardownFunc := func(t *testing.T, btest *httpbaselinetest.HTTPBaselineTest) error {
   // Maybe clean something up?
   return nil
 }
-bts := httpbaselinetest.NewDefaultBaselineTestSuite(t)
-bts.Run("POST v1 car with auth", httpbaselinetest.BaselineTest{
+bts := httpbaselinetest.NewDefaultSuite(t)
+bts.Run("POST v1 car with auth", httpbaselinetest.HTTPBaselineTest{
     Setup: setupFunc,
     Teardown: teardownFunc,
     Method:  http.MethodPost,
@@ -50,12 +50,12 @@ First, generate a set of baselines
 
     $ REBASELINE=1 go test ./pkg/... \
       -run TestBaselines/POST_v1_car_with_auth -count=1
-      
+
 Now, run your baseline tests to make sure nothing has changed
 
     $ go test ./pkg/... \
       -run TestBaselines/POST_v1_car_with_auth -count=1
-      
+
 What happens if your baseline doesn't match?  Here the request has been changed:
 
     $ go test ./pkg/... \
@@ -63,7 +63,7 @@ What happens if your baseline doesn't match?  Here the request has been changed:
     --- FAIL: TestBaselines (0.01s)
     --- FAIL: TestBaselines/POST_v1_car_with_auth (0.01s)
         suite.go:222: Request Difference
-        suite.go:223: 
+        suite.go:223:
             --- testdata/post_v1_car_with_auth.resp.txt (expected)
             +++ actual
             @@ -5 +5 @@

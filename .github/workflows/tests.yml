@@ -1,0 +1,49 @@
+name: tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.17.2'
+
+      - name: Set up Python for pre-commit
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - uses: actions/cache@v2
+        with:
+          path: ${{ env.pythonLocation }}
+          # make sure you update the pre-commit version below
+          key: ${{ env.pythonLocation }}-pip-pre-commit-2.14.0
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cache/pre-commit
+          key: ${{ runner.os }}-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: |
+          # make sure you update the pip cache key above
+          pip install pre-commit==2.14.0
+          pre-commit run --all-files
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
