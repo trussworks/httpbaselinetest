@@ -86,6 +86,9 @@ func (r *httpBaselineTestRunner) buildRequest() *http.Request {
 		bodyReader = bytes.NewReader(data)
 	}
 	req := httptest.NewRequest(r.btest.Method, r.btest.Path, bodyReader)
+	if r.btest.Host != "" {
+		req.Host = r.btest.Host
+	}
 	for key, val := range r.btest.Headers {
 		req.Header.Add(key, val)
 	}

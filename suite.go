@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -40,6 +41,7 @@ type HTTPBaselineTest struct {
 	Handler           http.Handler
 	Method            string
 	Path              string
+	Host              string
 	Body              interface{} // io.Reader or string
 	Headers           map[string]string
 	Cookies           []http.Cookie
@@ -160,8 +162,13 @@ func (r *httpBaselineTestRunner) assertBaselineEquality(expectedPath string, for
 }
 
 func (r *httpBaselineTestRunner) writeFile(path string, formattedData []byte) {
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		r.t.Fatalf("Error creating dir %s: %s", dir, err)
+	}
 	// #nosec G306 -- The test files should be world readable
-	err := ioutil.WriteFile(path, []byte(formattedData), 0644)
+	err = ioutil.WriteFile(path, []byte(formattedData), 0644)
 	if err != nil {
 		r.t.Fatalf("Error writing baseline %s: %s", path, err)
 	}
