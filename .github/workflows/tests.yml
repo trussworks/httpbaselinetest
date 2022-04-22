@@ -14,7 +14,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.17.2'
+          go-version: '^1.18.1'
 
       - name: Set up Python for pre-commit
         uses: actions/setup-python@v2
@@ -25,7 +25,7 @@ jobs:
         with:
           path: ${{ env.pythonLocation }}
           # make sure you update the pre-commit version below
-          key: ${{ env.pythonLocation }}-pip-pre-commit-2.14.0
+          key: ${{ env.pythonLocation }}-pip-pre-commit-2.17.0
 
       - uses: actions/cache@v2
         with:
@@ -35,7 +35,7 @@ jobs:
       - name: Run pre-commit
         run: |
           # make sure you update the pip cache key above
-          pip install pre-commit==2.14.0
+          pip install pre-commit==2.17.0
           pre-commit run --all-files
 
       - uses: actions/cache@v2

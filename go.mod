@@ -3,7 +3,7 @@ module github.com/trussworks/httpbaselinetest
 go 1.17
 
 require (
-	github.com/jmoiron/sqlx v1.3.4
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/romanyx/polluter v1.2.2
 	gopkg.in/yaml.v2 v2.4.0
