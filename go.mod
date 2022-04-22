@@ -15,6 +15,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/opencontainers/runc v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/romanyx/jwalk v1.0.0 // indirect
