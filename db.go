@@ -172,6 +172,7 @@ func buildFormattedDbBaseline(pgInsUpDel pgStatUserTableInsUpdDel,
 	removedRows []string, addedRows []string) (formattedDbBaseline, error) {
 	removedRowsJSON := make([]interface{}, len(removedRows))
 	addedRowsJSON := make([]interface{}, len(addedRows))
+	sort.Strings(removedRows)
 	for i := range removedRows {
 		var v interface{}
 		err := json.Unmarshal([]byte(removedRows[i]), &v)
@@ -180,6 +181,7 @@ func buildFormattedDbBaseline(pgInsUpDel pgStatUserTableInsUpdDel,
 		}
 		removedRowsJSON[i] = v
 	}
+	sort.Strings(addedRows)
 	for i := range addedRows {
 		var v interface{}
 		err := json.Unmarshal([]byte(addedRows[i]), &v)
