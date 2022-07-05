@@ -152,7 +152,7 @@ func dependencyOrder(depMap map[string][]string) []string {
 
 func getJSONTableData(db *sqlx.DB, tableName string, jsonTableData *JSONTableData) error {
 	sql := `SELECT to_jsonb("` + tableName + `".*) AS json_data FROM "` +
-		tableName + `"`
+		tableName + `" ORDER BY 1`
 	rows, err := db.Queryx(sql)
 	if err != nil {
 		return err
